@@ -4,6 +4,8 @@
 #include <util/atomic.h>
 #include <stdint.h>
 
+#include "volume.h"
+
 // HC-SR04: TRIG = D9 (PB1), ECHO = D8 (PB0)
 // Ingebouwde Arduino LED = D13 (PB5)
 
@@ -138,6 +140,9 @@ int main(void)
     // Input Capture en overflow interrupts
     TIMSK1 = (1 << ICIE1) | (1 << TOIE1);
 
+    // Volumeregeling initialiseren
+    volume_init();
+
     // Interrupts inschakelen
     sei();
 
@@ -167,7 +172,7 @@ int main(void)
             // Afstand = tijd in us / 58
             uint16_t distance_cm = (ticks + 58) / 116;
 
-            if (distance_cm >= 2 && distance_cm <= 65)
+            if (distance_cm >= 2 && distance_cm <= 65 && volume_get_percent() >= 50)
             {
                 // Geldige afstand: LED aan
                 PORTB |= (1 << LED_PIN);

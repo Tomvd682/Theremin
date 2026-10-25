@@ -8,6 +8,7 @@
 #include "buzzer.h"
 #include "median_filter.h"
 #include "filter_controls.h"
+#include "display7.h"
 
 // HC-SR04: TRIG = D9 (PB1), ECHO = D8 (PB0)
 // Ingebouwde Arduino LED = D13 (PB5)
@@ -146,6 +147,7 @@ int main(void)
     // Nodige zooi initialiseren
     volume_init();
     buzzer_init();
+    display7_init();
 
     // Medoaanfilter starten op grootte 5
     (void)median_filter_resize(5);
@@ -157,10 +159,21 @@ int main(void)
 
     // Laatste ingestelde volume onthouden
     uint8_t last_volume = 255;
+    uint8_t last_displayed_size = 0;
 
     while (1)
     {
         filter_controls_update();
+        // Filtergrootte op 7-segmentdisplay tonen
+        uint8_t current_filter_size = median_filter_get_size();
+
+        if (current_filter_size != last_displayed_size)
+        {
+            if (display7_show_hex(current_filter_size))
+            {
+                last_displayed_size = current_filter_size;
+            }
+        }
         uint8_t current_volume = volume_get_percent();
 
         if (current_volume != last_volume)

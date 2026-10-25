@@ -3,3 +3,6 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Losse testlogs en XML-exports zijn geen bronbestanden.
+/docs/test-results/

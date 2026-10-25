@@ -3,19 +3,26 @@
 #include <stdlib.h>
 #include <stddef.h>
 
+// De pc-tests gebruiken extra geheugencontrole en kunnen malloc laten mislukken
+// De filterberekening blijft hetzelfde
+#ifdef MEDIAN_FILTER_TEST_ALLOCATOR
+#include "filter_test_allocator.h"
+#define malloc filter_test_malloc
+#define free filter_test_free
+#endif
+
 #define FILTER_MAX_SIZE 15
 
 typedef struct
 {
     uint16_t value;
-    uint8_t age;
+    uint8_t age; // 0 is de nieuwste meting
 } FilterSample;
 
 static FilterSample *samples = NULL;
 static uint8_t filter_size = 0;
 static uint8_t sample_count = 0;
 
-// Vergelijken op meetwaarde
 static int compare_value(const void *a, const void *b)
 {
     const FilterSample *first = a;
@@ -27,7 +34,6 @@ static int compare_value(const void *a, const void *b)
     return 0;
 }
 
-// Vergelijken op leeftijd (nieuwste eerst)
 static int compare_age(const void *a, const void *b)
 {
     const FilterSample *first = a;
@@ -54,13 +60,12 @@ bool median_filter_resize(uint8_t new_size)
         return true;
     }
 
-    // Nieuw geheugen reserveren
     FilterSample *new_samples =
         malloc((size_t)new_size * sizeof(FilterSample));
 
     if (new_samples == NULL)
     {
-        // Oude buffer blijft behouden
+        // Bij te weinig geheugen blijven de oude metingen bewaard
         return false;
     }
 
@@ -85,7 +90,6 @@ bool median_filter_resize(uint8_t new_size)
         }
     }
 
-    // Oude geheugen vrijgeven
     free(samples);
 
     samples = new_samples;
@@ -103,7 +107,6 @@ uint16_t median_filter_add(uint16_t value)
         return value;
     }
 
-    // Bestaande metingen ouder maken
     for (uint8_t i = 0; i < sample_count; i++)
     {
         samples[i].age++;
@@ -111,7 +114,6 @@ uint16_t median_filter_add(uint16_t value)
 
     if (sample_count < filter_size)
     {
-        // Buffer is nog niet vol
         samples[sample_count].value = value;
         samples[sample_count].age = 0;
 
@@ -130,12 +132,11 @@ uint16_t median_filter_add(uint16_t value)
             }
         }
 
-        // Oudste meting vervangen
         samples[oldest].value = value;
         samples[oldest].age = 0;
     }
 
-    // Tijdelijke kopie maken om te sorteren
+    // Sorteer een kopie zodat de meetvolgorde bewaard blijft
     FilterSample sorted[FILTER_MAX_SIZE];
 
     for (uint8_t i = 0; i < sample_count; i++)
@@ -143,10 +144,13 @@ uint16_t median_filter_add(uint16_t value)
         sorted[i] = samples[i];
     }
 
+    // Na toevoegen zijn altijd 1..filter_size elementen gevuld
+    // Cppcheck geeft hier onterecht een waarschuwing
+    // cppcheck-suppress uninitvar
     qsort(sorted, sample_count,
           sizeof(FilterSample), compare_value);
 
-    // Middelste waarde teruggeven
+    // Kies bij een even aantal metingen de laagste middelste waarde
     return sorted[(sample_count - 1) / 2].value;
 }
 

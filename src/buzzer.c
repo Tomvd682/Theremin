@@ -1,4 +1,5 @@
 #include "buzzer.h"
+#include "theremin_math.h"
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -7,12 +8,10 @@
 
 #define BUZZER_PIN PD3
 
-#define MIN_FREQUENCY 230U
-#define MAX_FREQUENCY 1400U
-
 static volatile uint8_t duty_cycle = 0;
-static volatile uint8_t tone_phase = 0;
-static volatile uint32_t time_16us_ticks = 0; // tijd in stappen van 16 us
+static uint8_t tone_phase = 0;
+static volatile uint8_t requested_top = 134;
+static volatile uint32_t time_16us_ticks = 0; // Tijd in stappen van 16 us
 
 void buzzer_init(void)
 {
@@ -32,24 +31,30 @@ void buzzer_init(void)
     TCCR0B = (1 << CS02);
     OCR0A = 134;
 
-    // Interrupt bij Compare Match A
+    // Timer0-interrupt bij compare match A
     TIMSK0 |= (1 << OCIE0A);
+
 }
 
-// Iedere halve toonperiode schakelen we PWM aan of uit
+
+// Schakel PWM elke halve toonperiode aan of uit
 ISR(TIMER0_COMPA_vect)
 {
     // Tijd bijhouden voor de debounce van knoppen
     time_16us_ticks += (uint16_t)OCR0A + 1U;
 
+    // Pas TOP na de compare match aan om geen match over te slaan
+    // Tel eerst de oude periode bij de klok op
+    OCR0A = requested_top;
+
     if (tone_phase && duty_cycle > 0)
     {
-        // PWM-signaal naar de buzzer sturen
+        // PWM signaal naar de buzzee
         TCCR2A |= (1 << COM2B1);
     }
     else
     {
-        // PWM-output uit en pin laag maken
+        // PWM output uit en pin laag maken
         TCCR2A &= ~(1 << COM2B1);
         PORTD &= ~(1 << BUZZER_PIN);
     }
@@ -59,50 +64,18 @@ ISR(TIMER0_COMPA_vect)
 
 void buzzer_set_frequency(uint16_t frequency_hz)
 {
-    if (frequency_hz < MIN_FREQUENCY)
-    {
-        frequency_hz = MIN_FREQUENCY;
-    }
-
-    if (frequency_hz > MAX_FREQUENCY)
-    {
-        frequency_hz = MAX_FREQUENCY;
-    }
-
-    // Timer0 werkt op 16 MHz met prescaler 256
-    // Afgerond naar een geldig aantal timer-ticks
-    uint32_t denominator = 512UL * frequency_hz;
-
-    uint32_t ticks =
-        (16000000UL + denominator - 1UL) / denominator;
-
-    // Binnen de bruikbare frequentiegrenzen houden
-    if (ticks < 23)
-    {
-        ticks = 23;
-    }
-
-    if (ticks > 135)
-    {
-        ticks = 135;
-    }
-
-    OCR0A = (uint8_t)(ticks - 1);
+    requested_top = theremin_timer0_top(frequency_hz);
 }
 
 void buzzer_set_volume(uint8_t volume_percent)
 {
-    if (volume_percent > 100)
+    uint8_t pwm_value = theremin_volume_pwm(volume_percent);
+
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
-        volume_percent = 100;
+        duty_cycle = pwm_value;
+        OCR2B = pwm_value;
     }
-
-    // Percentage omzetten naar 8-bit PWM
-    uint8_t pwm_value =
-        (uint8_t)(((uint16_t)volume_percent * 255U) / 100U);
-
-    duty_cycle = pwm_value;
-    OCR2B = pwm_value;
 }
 
 uint32_t buzzer_get_time_ticks(void)

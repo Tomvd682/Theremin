@@ -1,4 +1,5 @@
 #include "volume.h"
+#include "theremin_math.h"
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
@@ -9,7 +10,7 @@ void volume_init(void)
     // AVCC als referentie, links uitgelijnd, ADC0
     ADMUX = (1 << REFS0) | (1 << ADLAR);
 
-    // Free-running mode
+    // Laat de ADC steeds opnieuw meten
     ADCSRB = 0;
 
     // Digitale inputbuffer op PC0 uitschakelen
@@ -27,7 +28,7 @@ void volume_init(void)
     ADCSRA |= (1 << ADSC);
 }
 
-// Wordt aangeroepen wanneer een ADC-meting klaar is
+// Bewaar het resultaat zodra de ADC-meting klaar is
 ISR(ADC_vect)
 {
     volume_raw = ADCH;
@@ -35,5 +36,5 @@ ISR(ADC_vect)
 
 uint8_t volume_get_percent(void)
 {
-    return (uint8_t)(((uint16_t)volume_raw * 100U + 127U) / 255U);
+    return theremin_volume_percent(volume_raw);
 }

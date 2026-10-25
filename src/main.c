@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "volume.h"
+#include "buzzer.h"
 
 // HC-SR04: TRIG = D9 (PB1), ECHO = D8 (PB0)
 // Ingebouwde Arduino LED = D13 (PB5)
@@ -140,14 +141,26 @@ int main(void)
     // Input Capture en overflow interrupts
     TIMSK1 = (1 << ICIE1) | (1 << TOIE1);
 
-    // Volumeregeling initialiseren
+    // Nodige zooi initialiseren
     volume_init();
+    buzzer_init();
 
     // Interrupts inschakelen
     sei();
 
+    // Laatste ingestelde volume onthouden
+    uint8_t last_volume = 255;
+
     while (1)
     {
+        uint8_t current_volume = volume_get_percent();
+
+        if (current_volume != last_volume)
+        {
+            buzzer_set_volume(current_volume);
+            last_volume = current_volume;
+        }
+
         if (sensor_state == SENSOR_IDLE)
         {
             sensor_start();
@@ -172,15 +185,23 @@ int main(void)
             // Afstand = tijd in us / 58
             uint16_t distance_cm = (ticks + 58) / 116;
 
-            if (distance_cm >= 2 && distance_cm <= 65 && volume_get_percent() >= 50)
+            if (distance_cm >= 2 && distance_cm <= 65)
             {
                 // Geldige afstand: LED aan
                 PORTB |= (1 << LED_PIN);
+
+                // Afstand omzetten naar toonhoogte
+                uint16_t frequency = 1400U - (18U * distance_cm);
+
+                buzzer_set_frequency(frequency);
             }
             else
             {
-                // Buiten bereik: LED uit
+                // Ongeldige afstand: LED uit
                 PORTB &= ~(1 << LED_PIN);
+
+                // Laagste toonhoogte
+                buzzer_set_frequency(230);
             }
         }
     }

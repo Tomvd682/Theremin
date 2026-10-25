@@ -6,6 +6,7 @@
 
 #include "volume.h"
 #include "buzzer.h"
+#include "median_filter.h"
 
 // HC-SR04: TRIG = D9 (PB1), ECHO = D8 (PB0)
 // Ingebouwde Arduino LED = D13 (PB5)
@@ -46,7 +47,7 @@ void sensor_start(void)
             // Bij prescaler 8: 30 ticks = 15 us
             OCR1A = 30;
 
-            // Trigger hoog maken
+            // Trigger hoog zetten
             PORTB |= (1 << TRIG_PIN);
 
             // Interrupt om trigger weer laag te maken
@@ -145,7 +146,10 @@ int main(void)
     volume_init();
     buzzer_init();
 
-    // Interrupts inschakelen
+    // Medoaanfilter starten met filter grootte 5
+    uint8_t filter_available = median_filter_resize(5);
+    
+    // Interrupts aan zetten
     sei();
 
     // Laatste ingestelde volume onthouden
@@ -187,11 +191,19 @@ int main(void)
 
             if (distance_cm >= 2 && distance_cm <= 65)
             {
-                // Geldige afstand: LED aan
                 PORTB |= (1 << LED_PIN);
 
-                // Afstand omzetten naar toonhoogte
-                uint16_t frequency = 1400U - (18U * distance_cm);
+                // Afstand filteren als geheugen beschikbaar is
+                uint16_t filtered_distance = distance_cm;
+
+                if (filter_available)
+                {
+                    filtered_distance = median_filter_add(distance_cm);
+                }
+
+                // Gefilterde afstand naar toonhoogte omzetten
+                uint16_t frequency =
+                    1400U - (18U * filtered_distance);
 
                 buzzer_set_frequency(frequency);
             }

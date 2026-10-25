@@ -3,6 +3,8 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+#include <util/atomic.h>
+
 #define BUZZER_PIN PD3
 
 #define MIN_FREQUENCY 230U
@@ -10,6 +12,7 @@
 
 static volatile uint8_t duty_cycle = 0;
 static volatile uint8_t tone_phase = 0;
+static volatile uint32_t time_16us_ticks = 0; // tijd in stappen van 16 us
 
 void buzzer_init(void)
 {
@@ -36,6 +39,9 @@ void buzzer_init(void)
 // Iedere halve toonperiode schakelen we PWM aan of uit
 ISR(TIMER0_COMPA_vect)
 {
+    // Tijd bijhouden voor de debounce van knoppen
+    time_16us_ticks += (uint16_t)OCR0A + 1U;
+
     if (tone_phase && duty_cycle > 0)
     {
         // PWM-signaal naar de buzzer sturen
@@ -97,4 +103,16 @@ void buzzer_set_volume(uint8_t volume_percent)
 
     duty_cycle = pwm_value;
     OCR2B = pwm_value;
+}
+
+uint32_t buzzer_get_time_ticks(void)
+{
+    uint32_t ticks;
+
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
+    {
+        ticks = time_16us_ticks;
+    }
+
+    return ticks;
 }

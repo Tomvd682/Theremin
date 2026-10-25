@@ -7,4 +7,6 @@ void buzzer_init(void);
 void buzzer_set_frequency(uint16_t frequency_hz);
 void buzzer_set_volume(uint8_t volume_percent);
 
+uint32_t buzzer_get_time_ticks(void);
+
 #endif

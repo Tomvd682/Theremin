@@ -7,6 +7,7 @@
 #include "volume.h"
 #include "buzzer.h"
 #include "median_filter.h"
+#include "filter_controls.h"
 
 // HC-SR04: TRIG = D9 (PB1), ECHO = D8 (PB0)
 // Ingebouwde Arduino LED = D13 (PB5)
@@ -146,10 +147,12 @@ int main(void)
     volume_init();
     buzzer_init();
 
-    // Medoaanfilter starten met filter grootte 5
-    uint8_t filter_available = median_filter_resize(5);
-    
-    // Interrupts aan zetten
+    // Medoaanfilter starten op grootte 5
+    (void)median_filter_resize(5);
+
+    // Filterknoppen initialiseren
+    filter_controls_init();
+
     sei();
 
     // Laatste ingestelde volume onthouden
@@ -157,6 +160,7 @@ int main(void)
 
     while (1)
     {
+        filter_controls_update();
         uint8_t current_volume = volume_get_percent();
 
         if (current_volume != last_volume)
@@ -196,7 +200,7 @@ int main(void)
                 // Afstand filteren als geheugen beschikbaar is
                 uint16_t filtered_distance = distance_cm;
 
-                if (filter_available)
+                if (median_filter_get_size() != 0)
                 {
                     filtered_distance = median_filter_add(distance_cm);
                 }

@@ -40,7 +40,7 @@ void buzzer_init(void)
 // Schakel PWM elke halve toonperiode aan of uit
 ISR(TIMER0_COMPA_vect)
 {
-    // Tijd bijhouden voor de debounce van knoppen
+    // Houd de klok voor knop debounc en displays bij
     time_16us_ticks += (uint16_t)OCR0A + 1U;
 
     // Pas TOP na de compare match aan om geen match over te slaan
@@ -78,7 +78,7 @@ void buzzer_set_volume(uint8_t volume_percent)
     }
 }
 
-uint32_t buzzer_get_time_ticks(void)
+uint32_t buzzer_get_time_16us_ticks(void)
 {
     uint32_t ticks;
 

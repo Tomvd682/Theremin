@@ -2,37 +2,21 @@
 #include "i2c.h"
 #include "buzzer.h"
 
-static uint8_t display_address = 0xFF;
+#define DISPLAY7_NOT_FOUND 0xFFU
+#define DISPLAY7_RETRY_INTERVAL_TICKS (100000UL / BUZZER_TIME_TICK_US) // 100 ms
+
+static uint8_t display_address = DISPLAY7_NOT_FOUND;
 static bool waiting = false;
 static uint32_t retry_started = 0;
 
 void display7_init(void)
 {
-    display_address = 0xFF;
+    display_address = DISPLAY7_NOT_FOUND;
     waiting = false;
 
-    if (DISPLAY7_I2C_ADDRESS != 0xFF)
+    if (i2c_probe(DISPLAY7_I2C_ADDRESS))
     {
-        if (i2c_probe(DISPLAY7_I2C_ADDRESS))
-            display_address = DISPLAY7_I2C_ADDRESS;
-        return;
-    }
-
-    // Zoek eerst buiten het ingestelde LCD-adres
-    for (uint8_t address = 0x20; address <= 0x27; ++address)
-    {
-        if (address != LCD_I2C_ADDRESS && i2c_probe(address))
-        {
-            display_address = address;
-            return;
-        }
-    }
-
-    // Alleen het gereserveerde adres gevonden: behoud het bestaande display
-    if (LCD_I2C_ADDRESS >= 0x20 && LCD_I2C_ADDRESS <= 0x27 &&
-        i2c_probe(LCD_I2C_ADDRESS))
-    {
-        display_address = LCD_I2C_ADDRESS;
+        display_address = DISPLAY7_I2C_ADDRESS;
     }
 }
 
@@ -65,12 +49,13 @@ bool display7_show_hex(uint8_t value)
         0x71  // F
     };
 
-    if (value > 15 || display_address == 0xFF)
+    if (value > 15 || display_address == DISPLAY7_NOT_FOUND)
     {
         return false;
     }
 
-    if (waiting && (uint32_t)(buzzer_get_time_ticks() - retry_started) < 6250UL)
+    if (waiting && (uint32_t)(buzzer_get_time_16us_ticks() - retry_started) <
+                   DISPLAY7_RETRY_INTERVAL_TICKS)
     {
         return false;
     }
@@ -81,6 +66,6 @@ bool display7_show_hex(uint8_t value)
     bool success = i2c_write(display_address, &pattern, 1);
 
     waiting = !success;
-    if (waiting) retry_started = buzzer_get_time_ticks();
+    if (waiting) retry_started = buzzer_get_time_16us_ticks();
     return success;
 }

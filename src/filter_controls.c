@@ -50,7 +50,7 @@ void filter_controls_update(void)
         changed = buttons_changed;
         buttons_changed = 0;
         current_buttons = PIND & BUTTON_MASK;
-        now = buzzer_get_time_ticks();
+        now = buzzer_get_time_16us_ticks();
 
         // Een knop kan ook veranderen terwijl interrupts uitstaan
         // Controleer drm de hardwareflag en laat de ISR die afhandelen

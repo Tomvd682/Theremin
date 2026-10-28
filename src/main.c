@@ -74,8 +74,7 @@ ISR(TIMER1_CAPT_vect)
 {
     if (sensor_state == SENSOR_WAIT_RISE)
     {
-        // Gebruik het bepaalde  tijdstip, niet het moment waarop de ISR begint
-        // Zo telt de wachttijd op de ISR niet mee in de afstand
+        // Lees het vastgelegde tijdstip zodat ISR-wachttijd niet meetelt
         echo_start_ticks = ICR1;
 
         // Wacht tot ECHO van HIGH naar LOW gaat
@@ -221,7 +220,6 @@ int main(void)
             }
             else
             {
-                // Ongeldige afstand: LED uit
                 PORTB &= ~(1 << LED_PIN);
             }
 

@@ -23,7 +23,7 @@ static uint8_t commands[32];
 static uint8_t command_count;
 static uint8_t clears;
 
-uint32_t buzzer_get_time_ticks(void)
+uint32_t buzzer_get_time_16us_ticks(void)
 {
     return ticks;
 }
@@ -107,7 +107,7 @@ void setUp(void)
 {
     ticks = 0;
     memset(devices, 0, sizeof(devices));
-    devices[0x20] = true;
+    devices[DISPLAY7_I2C_ADDRESS] = true;
     devices[LCD_I2C_ADDRESS] = true;
     fail_next = false;
     writes = 0;
@@ -148,22 +148,13 @@ static void assert_rows(const char *first, const char *second)
 
 static void test_displays_use_separate_addresses(void)
 {
-    TEST_ASSERT_EQUAL_HEX8(0x20, display7_get_address());
+    TEST_ASSERT_EQUAL_HEX8(0x21, display7_get_address());
+    TEST_ASSERT_EQUAL_HEX8(0x27, LCD_I2C_ADDRESS);
     run_steps(300);
     TEST_ASSERT_TRUE(lcd_writes > 0);
     TEST_ASSERT_TRUE(display7_show_hex(5));
     TEST_ASSERT_EQUAL_UINT16(1, display7_writes);
     TEST_ASSERT_EQUAL_HEX8(0x92, last_segments);
-}
-
-static void test_only_shared_address_keeps_lcd_disabled(void)
-{
-    devices[0x20] = false;
-    display7_init();
-    TEST_ASSERT_EQUAL_HEX8(LCD_I2C_ADDRESS, display7_get_address());
-    lcd_init(display7_get_address());
-    run_steps(300);
-    TEST_ASSERT_EQUAL_UINT16(0, writes);
 }
 
 static void test_direct_address_conflict_disables_lcd(void)
@@ -277,7 +268,7 @@ static void test_failed_update_reinitializes_and_restores_the_screen(void)
 static void test_clock_wrap_does_not_stop_initialization(void)
 {
     ticks = UINT32_MAX - 1000UL;
-    lcd_init(0x20);
+    lcd_init(DISPLAY7_I2C_ADDRESS);
     lcd_set_measurement(15, 1130);
     run_steps(300);
     assert_rows("Afstand:   15 cm", "Freq:    1130 Hz");
@@ -306,7 +297,6 @@ int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_displays_use_separate_addresses);
-    RUN_TEST(test_only_shared_address_keeps_lcd_disabled);
     RUN_TEST(test_direct_address_conflict_disables_lcd);
     RUN_TEST(test_initialization_sequence_and_first_wait);
     RUN_TEST(test_shows_raw_distance_and_filtered_frequency);

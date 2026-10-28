@@ -24,7 +24,7 @@ static bool i2c_stop(uint16_t *remaining)
     {
         if (*remaining == 0)
         {
-            // Laat de bus los als een apparaat de overdracht tegenhoudt
+            // Herstart TWI als STOP niet lukt
             TWCR = 0;
             TWCR = (1 << TWEN);
             return false;

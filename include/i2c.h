@@ -5,7 +5,6 @@
 #include <stdint.h>
 
 // Gemeten op 28 oktober 2026
-// Gebruik 0xFF om automatisch te zoeken binnen 0x20 t/m 0x27
 #ifndef DISPLAY7_I2C_ADDRESS
 #define DISPLAY7_I2C_ADDRESS 0x21
 #endif
@@ -15,9 +14,8 @@
 #define LCD_I2C_ADDRESS 0x27
 #endif
 
-#if DISPLAY7_I2C_ADDRESS != 0xFF && \
-    (DISPLAY7_I2C_ADDRESS < 0x20 || DISPLAY7_I2C_ADDRESS > 0x27)
-#error "Het 7-segmentadres moet tussen 0x20 en 0x27 liggen, of 0xFF zijn"
+#if DISPLAY7_I2C_ADDRESS < 0x20 || DISPLAY7_I2C_ADDRESS > 0x27
+#error "Het 7-segmentadres moet tussen 0x20 en 0x27 liggen"
 #endif
 
 #if LCD_I2C_ADDRESS < 0x08 || LCD_I2C_ADDRESS > 0x77

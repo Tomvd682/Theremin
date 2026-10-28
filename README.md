@@ -60,8 +60,6 @@ Een PCF8574 gebruikt 0x20..0x27; een PCF8574A gebruikt 0x38..0x3F.
 Pas zo nodig de adresjumpers volgens het adapterschema aan en scan opnieuw.
 Het tijdelijke scannerproject is na de adrescontrole verwijderd.
 
-Automatisch zoeken kan nog met `DISPLAY7_I2C_ADDRESS=0xFF`; het LCD-adres wordt eerst overgeslagen.
-Antwoordt alleen dat adres, dan krijgt het 7-segmentdisplay voorrang en blijft het LCD uit.
 Twee gelijke expliciet ingestelde adressen geven een compilerfout.
 
 Met de huidige instellingen werkt het LCD in de praktijktests:
@@ -92,12 +90,12 @@ Voer de commando's uit vanuit de projectmap:
 | Firmware bouwen | `pio run -e uno` |
 | Naar de aangesloten Uno uploaden | `pio run -e uno -t upload` |
 | Bestaande 35 tests uitvoeren | `pio test -e native -v` |
-| 14 displaytests uitvoeren | `pio test -e native_display -v` |
+| 13 displaytests uitvoeren | `pio test -e native_display -v` |
 | Statische codecontrole | `pio check -e uno --skip-packages --fail-on-defect low --fail-on-defect medium --fail-on-defect high` |
 
 Voor uploaden kun je zo nodig `--upload-port COMx` toevoegen met jouw poortnummer.
 Alleen het uploadcommando schrijft firmware naar de Uno. De tests draaien op de pc.
-De displaytests bootsen de bus en klok na met vaste testadressen 0x20 en 0x27.
+De displaytests bootsen de bus en klok na met de ingestelde adressen 0x21 en 0x27.
 Ze controleren niet de echte adressen, bedrading of elektrische timing van jouw hardware.
 Op Windows kan `$env:PYTHONUTF8 = '1'` helpen bij console-encodingproblemen.
 De uitvoer staat in de terminal; aparte log- of XML-bestanden zijn niet nodig.
@@ -108,7 +106,7 @@ Buildproducten staan in `.pio/` en worden niet in Git opgenomen.
 | Controle | Datum | Resultaat |
 | --- | --- | --- |
 | AVR-build en Cppcheck | 28 oktober 2026 | PASS |
-| Bestaande tests en displaytests op de pc | 28 oktober 2026 | 35/35 en 14/14 PASS |
+| Bestaande tests en displaytests op de pc | 28 oktober 2026 | 35/35 en 13/13 PASS |
 | Zes praktijktests die ik zelf heb uitgevoerd met de versie zonder LCD | 25 oktober 2026 | PASS |
 | Acht praktijktests van de huidige LCD-versie | 28 oktober 2026 | 8/8 PASS |
 

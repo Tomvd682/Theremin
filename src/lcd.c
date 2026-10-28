@@ -7,8 +7,10 @@
 
 #define LCD_COLUMNS 16U
 #define LCD_CHARACTERS 32U
-#define LCD_REFRESH_TICKS 15625UL
-#define TIMER0_MAX_TICKS 135U
+#define LCD_REFRESH_INTERVAL_TICKS (250000UL / BUZZER_TIME_TICK_US) // 250 ms
+#define TIMER0_MAX_PERIOD_TICKS 135U // Langste tooninterruptperiode in ticks van 16 us
+#define LCD_CURSOR_UNKNOWN 0xFFU
+#define LCD_UNWRITTEN_CHAR 0xFFU
 
 static bool enabled;
 static uint8_t init_step;
@@ -54,10 +56,10 @@ static bool lcd_write_byte(uint8_t value, bool data)
 
 static void lcd_wait_ms(uint16_t milliseconds)
 {
-    wait_started = buzzer_get_time_ticks();
+    wait_started = buzzer_get_time_16us_ticks();
     // De klok springt per tooninterrupt, tel daarom één maximale periode extra
-    wait_ticks = (uint16_t)(((uint32_t)milliseconds * 1000UL + 15UL) / 16UL
-                           + TIMER0_MAX_TICKS);
+    wait_ticks = (uint16_t)(((uint32_t)milliseconds * 1000UL + BUZZER_TIME_TICK_US - 1UL)
+                           / BUZZER_TIME_TICK_US + TIMER0_MAX_PERIOD_TICKS);
 }
 
 static void lcd_number(uint8_t start, uint8_t width, uint16_t value)
@@ -82,23 +84,23 @@ static void lcd_format(void)
 static void lcd_retry(void)
 {
     init_step = 0;
-    cursor = 0xFF;
-    memset(shown, 0xFF, sizeof(shown));
+    cursor = LCD_CURSOR_UNKNOWN;
+    memset(shown, LCD_UNWRITTEN_CHAR, sizeof(shown));
     // Een ontbrekend LCD niet bij elke hoofdloop opnieuw aanspreken
     lcd_wait_ms(1000);
 }
 
 void lcd_init(uint8_t display7_address)
 {
-    // Een ACK kan geen onderscheid maken tussen beide soorten displays
+    // Schrijf niet naar het adres van het 7-segmentdisplay
     enabled = display7_address != LCD_I2C_ADDRESS;
     init_step = 0;
-    cursor = 0xFF;
+    cursor = LCD_CURSOR_UNKNOWN;
     distance = 0;
     frequency = 230;
-    memset(shown, 0xFF, sizeof(shown));
+    memset(shown, LCD_UNWRITTEN_CHAR, sizeof(shown));
     lcd_format();
-    frame_started = buzzer_get_time_ticks();
+    frame_started = buzzer_get_time_16us_ticks();
     lcd_wait_ms(50);
 }
 
@@ -121,7 +123,7 @@ void lcd_update(void)
     };
 
     if (!enabled) return;
-    uint32_t now = buzzer_get_time_ticks();
+    uint32_t now = buzzer_get_time_16us_ticks();
     if ((uint32_t)(now - wait_started) < wait_ticks) return;
 
     if (init_step < sizeof(init_commands))
@@ -148,7 +150,7 @@ void lcd_update(void)
         if (init_step == sizeof(init_commands))
         {
             lcd_format();
-            frame_started = buzzer_get_time_ticks();
+            frame_started = buzzer_get_time_16us_ticks();
         }
         return;
     }
@@ -172,7 +174,8 @@ void lcd_update(void)
             {
                 shown[position] = wanted[position];
                 // Na kolom 16 ligt de volgende regel op een ander LCD-adres
-                cursor = position == 15 || position == 31 ? 0xFF : position + 1;
+                cursor = position == LCD_COLUMNS - 1U || position == LCD_CHARACTERS - 1U
+                       ? LCD_CURSOR_UNKNOWN : position + 1U;
             }
         }
 
@@ -181,7 +184,7 @@ void lcd_update(void)
     }
 
     // Maak eerst het huidige beeld af en neem dan de nieuwste meting over
-    if ((uint32_t)(now - frame_started) >= LCD_REFRESH_TICKS)
+    if ((uint32_t)(now - frame_started) >= LCD_REFRESH_INTERVAL_TICKS)
     {
         lcd_format();
         frame_started = now;

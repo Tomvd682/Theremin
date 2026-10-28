@@ -10,14 +10,16 @@ De werking en aansluitingen staan in de [README](../README.md).
 
 ## 2. Automatische tests
 
-De volgende controles zijn op 28 oktober 2026 uitgevoerd met PlatformIO:
+De volgende controles zijn op 28 oktober 2026 uitgevoerd:
 
 | Controle | Resultaat | Status |
 | --- | --- | --- |
 | Bestaande Unity-tests | 35 geslaagd, 0 mislukt, 0 genegeerd | PASS |
-| Displaytests | 14 geslaagd, 0 mislukt, 0 genegeerd | PASS |
+| Displaytests | 13 geslaagd, 0 mislukt, 0 genegeerd | PASS |
+| Totaal automatische tests | 48 geslaagd, 0 mislukt, 0 genegeerd | PASS |
 | AVR-build | Firmware bouwt zonder compilerfouten | PASS |
 | Cppcheck | Geen meldingen met de ingestelde controles | PASS |
+| `git diff --check` | Geen fouten in de witruimte van de wijzigingen | PASS |
 
 De tests controleren vooral:
 
@@ -29,9 +31,10 @@ De tests controleren vooral:
 
 De tests gebruiken de echte filter-, reken- en displaycode.
 Voor de displaytests worden de I2C-bus en klok nagebootst.
+Ze gebruiken nu de vaste adressen uit `include/i2c.h`.
 Dit controleert de software, maar bewijst niet hoe de echte elektronica reageert.
 De afzonderlijke testgevallen staan in de [35 bestaande tests](../test/test_core/test_main.c)
-en de [14 displaytests](../test/test_display/test_main.c).
+en de [13 displaytests](../test/test_display/test_main.c).
 
 ### Opnieuw uitvoeren
 
@@ -42,6 +45,7 @@ pio run -e uno
 pio test -e native -v
 pio test -e native_display -v
 pio check -e uno --skip-packages --fail-on-defect low --fail-on-defect medium --fail-on-defect high
+git diff --check
 ```
 
 Voor de pc-tests zijn PlatformIO en GCC/G++ nodig. Een Arduino hoeft daarvoor
@@ -81,9 +85,14 @@ Ook de uitlijning van `cm` en `Hz` op het LCD werkt goed.
 De 230 Hz is de gekozen softwarewaarde, geen nauwkeurig gemeten toonfrequentie.
 Er zijn geen exacte tijdmetingen of een duur van de stabiliteitstest vastgelegd.
 
+Op 28 oktober 2026 heb ik na de vereenvoudiging de firmware opnieuw naar de Uno geüpload.
+De afstandssensor en toonhoogte, volumeregeling, filterknoppen en het 7-segmentdisplay
+werken nog goed. Ook het LCD met afstand en frequentie, de tekstuitlijning en de
+weergave en het gedrag bij een ongeldige afstand werken nog goed (PASS).
+
 ## 4. Testresultaten
 
-Alle 49 automatische tests zijn geslaagd. Ook de zes praktijktests van 25 oktober
+Alle 48 automatische tests zijn geslaagd. Ook de zes praktijktests van 25 oktober
 en de acht praktijktests van 28 oktober zijn geslaagd.
 
 De I2C-adressen heb ik op 28 oktober 2026 op de hardware gecontroleerd:

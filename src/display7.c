@@ -1,107 +1,44 @@
 #include "display7.h"
-
-#include <avr/io.h>
-#include <stdint.h>
-#include <util/delay.h>
-
-#define TWI_TIMEOUT 30000U
+#include "i2c.h"
+#include "buzzer.h"
 
 static uint8_t display_address = 0xFF;
-
-static bool twi_wait(void)
-{
-    uint16_t timeout = TWI_TIMEOUT;
-
-    while (!(TWCR & (1 << TWINT)))
-    {
-        if (--timeout == 0)
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-static void twi_stop(void)
-{
-    TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWSTO);
-}
-
-static bool twi_start(uint8_t address)
-{
-    TWCR = (1 << TWINT) | (1 << TWSTA) | (1 << TWEN);
-
-    if (!twi_wait())
-    {
-        twi_stop();
-        return false;
-    }
-
-    uint8_t status = TWSR & 0xF8;
-
-    if (status != 0x08 && status != 0x10)
-    {
-        twi_stop();
-        return false;
-    }
-
-    TWDR = address << 1;
-    TWCR = (1 << TWINT) | (1 << TWEN);
-
-    if (!twi_wait())
-    {
-        twi_stop();
-        return false;
-    }
-
-    if ((TWSR & 0xF8) != 0x18)
-    {
-        twi_stop();
-        return false;
-    }
-
-    return true;
-}
-
-static bool twi_write(uint8_t value)
-{
-    TWDR = value;
-    TWCR = (1 << TWINT) | (1 << TWEN);
-
-    if (!twi_wait())
-    {
-        return false;
-    }
-
-    return (TWSR & 0xF8) == 0x28;
-}
+static bool waiting = false;
+static uint32_t retry_started = 0;
 
 void display7_init(void)
 {
-    // SDA = PC4, SCL = PC5
-    DDRC &= ~((1 << DDC4) | (1 << DDC5));
-
-    // Interne pull-ups
-    PORTC |= (1 << PORTC4) | (1 << PORTC5);
-
-    // I2C op ongeveer 100 kHz
-    TWSR = 0;
-    TWBR = 72;
-    TWCR = (1 << TWEN);
-
-    // Zoek het adres van de PCF8574
     display_address = 0xFF;
+    waiting = false;
 
-    for (uint8_t address = 0x20; address <= 0x27; address++)
+    if (DISPLAY7_I2C_ADDRESS != 0xFF)
     {
-        if (twi_start(address))
+        if (i2c_probe(DISPLAY7_I2C_ADDRESS))
+            display_address = DISPLAY7_I2C_ADDRESS;
+        return;
+    }
+
+    // Zoek eerst buiten het ingestelde LCD-adres
+    for (uint8_t address = 0x20; address <= 0x27; ++address)
+    {
+        if (address != LCD_I2C_ADDRESS && i2c_probe(address))
         {
             display_address = address;
-            twi_stop();
-            break;
+            return;
         }
     }
+
+    // Alleen het gereserveerde adres gevonden: behoud het bestaande display
+    if (LCD_I2C_ADDRESS >= 0x20 && LCD_I2C_ADDRESS <= 0x27 &&
+        i2c_probe(LCD_I2C_ADDRESS))
+    {
+        display_address = LCD_I2C_ADDRESS;
+    }
+}
+
+uint8_t display7_get_address(void)
+{
+    return display_address;
 }
 
 bool display7_show_hex(uint8_t value)
@@ -133,7 +70,7 @@ bool display7_show_hex(uint8_t value)
         return false;
     }
 
-    if (!twi_start(display_address))
+    if (waiting && (uint32_t)(buzzer_get_time_ticks() - retry_started) < 6250UL)
     {
         return false;
     }
@@ -141,8 +78,9 @@ bool display7_show_hex(uint8_t value)
     // De segmenten zijn actief LOW
     uint8_t pattern = (uint8_t)~hex_segments[value];
 
-    bool success = twi_write(pattern);
-    twi_stop();
+    bool success = i2c_write(display_address, &pattern, 1);
 
+    waiting = !success;
+    if (waiting) retry_started = buzzer_get_time_ticks();
     return success;
 }

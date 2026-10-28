@@ -1,136 +1,146 @@
 # Theremin
 
-Dit project maakt geluid op basis van de afstand van je hand tot een sensor.
-Een hand dichter bij de sensor geeft een hogere toon. Met een potmeter regel je
-het volume. Twee knoppen veranderen hoeveel metingen het mediaanfilter gebruikt;
-het 7-segmentdisplay laat die filtergrootte zien.
+Dit is mijn project voor HBO-ICT Microcontrollers bij Windesheim.
+De afstand van je hand tot een sensor bepaalt de toonhoogte van een buzzer.
+Met een potmeter regel je het volume. Twee knoppen stellen het mediaanfilter in.
+Het 7-segmentdisplay op het Game Shield laat de filtergrootte zien.
 
-Het is een project voor HBO-ICT Microcontrollers bij Windesheim. De software is
-geschreven in bare-metal C voor de ATmega328P op een Arduino Uno: registers worden
-rechtstreeks ingesteld, zonder Arduino-framework. PlatformIO verzorgt het bouwen.
+Het 16x2 LCD toont de afstand en de berekende frequentie.
+De basiswerking heb ik op 28 oktober 2026 met acht praktijktests gecontroleerd.
+De software gebruikt bare-metal C op een Arduino Uno (ATmega328P), zonder Arduino-framework.
 
-## Hardware en bediening
-
-De Uno wordt gebruikt met een Game Shield en de onderstaande onderdelen.
+## Hardware en aansluitingen
 
 | Onderdeel | Aansluiting | Functie |
 | --- | --- | --- |
-| HC-SR04 | D9/PB1: TRIG, D8/PB0: ECHO/ICP1 | Afstand meten |
-| Potmeter | ADC0/PC0 | Volume regelen |
+| HC-SR04 | D9/PB1: TRIG, D8/PB0: ECHO | Afstand meten |
+| Potmeter | A0/ADC0/PC0 | Volume regelen |
 | Buzzer | D3/PD3/OC2B | Toon afspelen |
-| Plusknop | D4/PD4 | Filter twee metingen groter maken |
-| Minknop | D5/PD5 | Filter twee metingen kleiner maken |
-| PCF8574 met 7-segmentdisplay | SDA/PC4 en SCL/PC5 | Filtergrootte tonen via I2C |
-| Ingebouwde LED | D13/PB5 | Aangeven dat de afstand geldig is |
+| Plus- en minknop | D4/PD4 en D5/PD5 | Filtergrootte aanpassen |
+| 7-segmentdisplay met PCF8574 | Op het Game Shield, SDA/A4/PC4 en SCL/A5/PC5 | Filtergrootte tonen |
+| 16x2 LCD met I2C-adapter | SDA/A4 en SCL/A5; bij een 5V-adapter: VCC naar 5V en GND naar GND | Afstand en berekende frequentie |
+| Ingebouwde LED | D13/PB5 | Geldige afstand aangeven |
 
-De knoppen gebruiken interne pull-ups: los is HIGH en ingedrukt is LOW.
-Een stabiele druk geeft één stap; vasthouden herhaalt niet. Tegelijk indrukken
-geeft geen stap.
+Beide displays delen de I2C-bus. Controleer of de LCD-adapter geschikt is voor 5V voordat je hem aansluit.
+Zorg voor een gezamenlijke GND en controleer de pull-ups op SDA en SCL.
 
-Het filter start op 5 en ondersteunt 1, 3, 5, 7, 9, 11, 13 en 15 metingen.
-Het display toont dit hexadecimaal: 1, 3, 5, 7, 9, b, d en F.
-De software zoekt de PCF8574 bij het opstarten op adressen 0x20 tot en met 0x27.
+## Hoe werkt het?
 
-## Hoe de onderdelen samenwerken
+- Timer1 meet de lengte van de echopuls. De software rekent dit om naar centimeters.
+- Het mediaanfilter kiest de middelste van de laatste geldige metingen.
+  Zo geeft 10, 60, 11 cm als mediaan 11 cm. Een groter filter reageert langzamer.
+- De gefilterde afstand bepaalt de toon: `1400 - 18 * afstand`.
+  Timer0 schakelt de toon; Timer2 maakt het PWM-signaal voor het volume.
+- De potmeter wordt door de ADC uitgelezen. De knoppen gebruiken pull-ups: ingedrukt is LOW.
+  Na ongeveer 20 ms zonder verandering telt een druk één keer. Vasthouden herhaalt niet;
+  beide knoppen tegelijk geven geen stap.
+- Het filter start op 5 en ondersteunt 1, 3, 5, 7, 9, 11, 13 en 15 metingen.
+  Het display toont dit als 1, 3, 5, 7, 9, b, d en F.
+  Bij vergroten blijven de metingen bewaard; bij verkleinen blijven de nieuwste over.
+- Afgeronde afstanden van 2 t/m 65 cm zijn geldig. Anders gaat de LED uit en wordt
+  de laagste toon gekozen. Ongeldige metingen komen niet in het filter.
 
-1. Timer1 maakt de triggerpuls en legt de tijdstippen van beide ECHO-flanken vast.
-   Het verschil is de lengte van de echopuls. Daaruit volgt de afstand in cm.
-2. De hoofdloop accepteert afgeronde afstanden van 2 tot en met 65 cm. Het
-   mediaanfilter neemt de middelste waarde van de laatste geldige metingen.
-   Zo wordt bijvoorbeeld de reeks 10, 60, 11 cm gefilterd naar 11 cm.
-3. De gefilterde afstand bepaalt de gewenste frequentie: `1400 - 18 * afstand`.
-   Timer0 schakelt de toon iedere halve periode aan of uit. Timer2 maakt het
-   PWM-signaal op D3; de potmeter bepaalt de pulsbreedte en daarmee het volume.
-4. Een pin change interrupt meldt dat een knop is veranderd. De hoofdloop wacht
-   ongeveer 20 ms zonder nieuwe verandering voordat de druk wordt verwerkt.
-   Daarna worden de filtergrootte en het display bijgewerkt.
+## LCD instellen en controleren
 
-Bij een ongeldige afstand of een echo-timeout gaat de LED uit en klinkt de
-laagste toon. De ongeldige meting wordt niet aan het filter toegevoegd.
+De adressen staan in `include/i2c.h`. Het zijn 7-bit adressen, zonder lees-/schrijfbit.
 
-## Bouwen en testen
+| Instelling | Ingesteld adres | Controle |
+| --- | --- | --- |
+| `DISPLAY7_I2C_ADDRESS` | `0x21` | Op hardware gemeten op 28 oktober 2026 |
+| `LCD_I2C_ADDRESS` | `0x27` | Op hardware gemeten op 28 oktober 2026 |
 
-Installeer PlatformIO Core of de PlatformIO-extensie voor VS Code. Voor tests op
-de pc zijn GCC en G++ op `PATH` nodig, met hun runtime-DLL's op Windows.
-PlatformIO haalt de AVR-toolchain en Unity op. Voer vanuit de projectmap uit:
+De software gebruikt nu deze twee vaste adressen. Ze zijn verschillend, zodat de
+displays apart aangesproken worden. Start de Uno opnieuw na het ombedraden.
 
-```text
-pio run -e uno
-pio test -e native -v
-```
+Bij een andere adapter kun je opnieuw scannen met een los I2C-scanprogramma.
+Laat het Game Shield zitten: scan eerst zonder de losse LCD-adapter en daarna met LCD.
+Een nieuw adres hoort bij het LCD. Komt er geen adres bij, controleer dan voeding,
+bedrading en een mogelijk adresconflict. Schakel de voeding uit voor het ombedraden.
+Een PCF8574 gebruikt 0x20..0x27; een PCF8574A gebruikt 0x38..0x3F.
+Pas zo nodig de adresjumpers volgens het adapterschema aan en scan opnieuw.
+Het tijdelijke scannerproject is na de adrescontrole verwijderd.
 
-Het eerste commando bouwt de firmware. Het tweede voert 35 Unity-tests op de pc
-uit, zonder aangesloten Arduino. Deze commando's uploaden geen firmware.
-Alleen `pio run` gebruiken bouwt standaard de Uno-omgeving.
+Automatisch zoeken kan nog met `DISPLAY7_I2C_ADDRESS=0xFF`; het LCD-adres wordt eerst overgeslagen.
+Antwoordt alleen dat adres, dan krijgt het 7-segmentdisplay voorrang en blijft het LCD uit.
+Twee gelijke expliciet ingestelde adressen geven een compilerfout.
 
-Een extra statische controle op mogelijke codeproblemen is beschikbaar via:
+Met de huidige instellingen werkt het LCD in de praktijktests:
+P0=RS, P1=R/W, P2=E, P3=verlichting en P4..P7=D4..D7, met verlichting actief HIGH.
+Het exacte chiptype en de pinindeling zijn niet apart met een schema of meting gecontroleerd.
+Controleer die bij een andere adapter en pas zo nodig de maskers in `include/lcd.h` aan.
+De code gebruikt HD44780-aansturing. Stel het contrast zo af dat de tekst goed leesbaar is.
 
-```text
-pio check -e uno --skip-packages --fail-on-defect low --fail-on-defect medium --fail-on-defect high
-```
+Het LCD toont de laatst gemeten afstand en de berekende frequentie.
+Voor de frequentie wordt het mediaanfilter gebruikt; de getoonde afstand wordt niet gefilterd.
+De afstand kan dus wat schommelen terwijl de toon stabieler blijft.
+Een nulmeting of timeout toont `---`. Bij een ongeldige speelafstand wordt 230 Hz aangevraagd.
+De getoonde frequentie is berekend, niet gemeten. De code schrijft alleen veranderde tekens
+en probeert het LCD na een communicatiefout opnieuw in te stellen.
+De uitlijning van `cm` en `Hz` werkt goed en er blijven bij wisselende getallen geen oude cijfers staan.
 
-Op Windows kan `$env:PYTHONUTF8 = '1'` nodig zijn bij console-encodingproblemen.
-De laatst uitgevoerde controle gaf 35 geslaagde tests en een geslaagde AVR-build.
-De details en beperkingen staan in het [testrapport](docs/TESTRAPPORT.md).
+Meer achtergrond: [PCF8574](https://www.ti.com/lit/ds/symlink/pcf8574.pdf), [PCF8574A](https://www.ti.com/lit/ds/symlink/pcf8574a.pdf) en [HD44780](https://cdn-shop.adafruit.com/datasheets/HD44780.pdf).
 
-## Belangrijke keuzes in de code
+## Bouwen, uploaden en testen
 
-- **Korte ISR's:** interrupts leggen meetwaarden vast of zetten een vlag. De
-  hoofdloop doet het filteren, geheugen reserveren en bijwerken van het display.
-  `volatile` zorgt dat de compiler de gedeelde variabele telkens echt leest of
-  schrijft. Een atomic block voorkomt onderbreking tijdens een overdracht.
-- **Afstand in 32 bits berekenen:** op de AVR is `int` 16 bits. De optelling bij
-  het afronden wordt daarom eerst verbreed, zodat een grote tickwaarde niet omloopt.
-- **Timer0 op een vast moment aanpassen:** de nieuwe frequentie wordt pas bij een
-  compare match ingesteld. Midden in een periode een lagere eindwaarde schrijven
-  kan anders een compare match overslaan.
-- **Mediaanfilter met dynamisch geheugen:** `malloc()` reserveert de buffer.
-  Bij vergroten blijven bestaande metingen bewaard; bij verkleinen de nieuwste.
-  Eerst wordt de nieuwe buffer aangevraagd, daarna pas de oude vrijgegeven. Bij
-  `NULL` blijft de oude buffer bruikbaar. Zonder buffer geeft het filter de
-  invoer terug, toont het display 0 en kan plus opnieuw grootte 1 proberen.
-- **Dezelfde logica in firmware en tests:** de native tests bouwen de echte
-  filter-, reken- en debouncecode. Alleen `malloc()` en `free()` van het filter
-  krijgen in de tests extra controles en een mogelijkheid om een fout na te bootsen.
+Ik gebruik PlatformIO om het project te bouwen, te uploaden en te testen.
+Hiervoor kun je PlatformIO Core of de PlatformIO-extensie voor VS Code gebruiken.
+Voor tests op de pc zijn ook GCC en G++ op PATH nodig, inclusief hun runtime-DLL's op Windows.
+Voer de commando's uit vanuit de projectmap:
 
-## Wegwijs in de bestanden
-
-| Bestand/map | Inhoud |
+| Actie | Commando |
 | --- | --- |
-| `src/main.c` | Sensor, bijbehorende ISR's en hoofdloop |
-| `src/buzzer.c`, `src/volume.c`, `src/display7.c` | Hardware aansturen |
-| `src/filter_controls.c`, `src/button_debounce.c` | Knoppen uitlezen en dender onderdrukken |
+| Firmware bouwen | `pio run -e uno` |
+| Naar de aangesloten Uno uploaden | `pio run -e uno -t upload` |
+| Bestaande 35 tests uitvoeren | `pio test -e native -v` |
+| 14 displaytests uitvoeren | `pio test -e native_display -v` |
+| Statische codecontrole | `pio check -e uno --skip-packages --fail-on-defect low --fail-on-defect medium --fail-on-defect high` |
+
+Voor uploaden kun je zo nodig `--upload-port COMx` toevoegen met jouw poortnummer.
+Alleen het uploadcommando schrijft firmware naar de Uno. De tests draaien op de pc.
+De displaytests bootsen de bus en klok na met vaste testadressen 0x20 en 0x27.
+Ze controleren niet de echte adressen, bedrading of elektrische timing van jouw hardware.
+Op Windows kan `$env:PYTHONUTF8 = '1'` helpen bij console-encodingproblemen.
+De uitvoer staat in de terminal; aparte log- of XML-bestanden zijn niet nodig.
+Buildproducten staan in `.pio/` en worden niet in Git opgenomen.
+
+## Uitgevoerde en openstaande tests
+
+| Controle | Datum | Resultaat |
+| --- | --- | --- |
+| AVR-build en Cppcheck | 28 oktober 2026 | PASS |
+| Bestaande tests en displaytests op de pc | 28 oktober 2026 | 35/35 en 14/14 PASS |
+| Zes praktijktests die ik zelf heb uitgevoerd met de versie zonder LCD | 25 oktober 2026 | PASS |
+| Acht praktijktests van de huidige LCD-versie | 28 oktober 2026 | 8/8 PASS |
+
+Ik moet nog testen of de Theremin zonder aangesloten LCD blijft werken en of het LCD na
+een communicatiefout goed herstelt. Een echo-timeout met streepjes is nog niet apart getest.
+Gespecialiseerde timingmetingen, langdurige geheugentests en foutinjectie op de Uno staan nog open.
+Alle testgevallen, resultaten en technische onderbouwing staan in [docs/TESTRAPPORT.md](docs/TESTRAPPORT.md).
+
+## Belangrijkste codeonderdelen
+
+| Bestand of map | Inhoud |
+| --- | --- |
+| `src/main.c` | Sensor, meetinterrupts en hoofdloop |
+| `src/buzzer.c`, `src/volume.c` | Toon en volume |
 | `src/median_filter.c`, `src/theremin_math.c` | Filter en berekeningen |
-| `include/` | Functiedeclaraties en afspraken voor het gebruik |
-| `test/` | Unity-tests en geheugencontrole voor die tests |
-| `docs/TESTRAPPORT.md` | Automatische tests, praktijktests, technische onderbouwing en openstaande controles |
+| `src/filter_controls.c`, `src/button_debounce.c` | Knoppen en contactdender |
+| `src/i2c.c`, `src/display7.c`, `src/lcd.c` | Gedeelde bus en displays |
+| `include/`, `test/` | Functiedeclaraties en Unity-tests |
 
-## Beperkingen en openstaande controles
+Interrupts voeren alleen korte taken uit. De meeste berekeningen en updates gebeuren in de hoofdloop.
+Gedeelde variabelen worden veilig uitgelezen en aangepast.
+De afstandsberekening voorkomt dat grote waarden overlopen op de Uno.
+Het filter vraagt geheugen aan. Lukt een aanpassing niet, dan blijven de oude metingen bewaard.
+Zonder geheugen gaan metingen ongefilterd door, toont het display 0 en kan plus het opnieuw proberen.
+Dezelfde filter-, reken- en debouncecode wordt ook in de pc-tests gebruikt.
 
-Tests op de pc controleren geen elektrische signalen of echt interruptgedrag.
-De student heeft de gewijzigde firmware op 25 oktober 2026 geüpload en zes
-praktijktests als PASS gemeld. De resultaten en nog openstaande gespecialiseerde
-controles staan in het [testrapport](docs/TESTRAPPORT.md#handmatige-praktijktests).
-De sensor en afronding beperken de afstandsnauwkeurigheid. De timer werkt met
-hele ticks; de werkelijke tonen lopen daardoor ongeveer van 231 tot 1359 Hz.
-Een groter filter onderdrukt uitschieters beter, maar reageert ook langzamer.
-Tijdens het vullen gebruikt een even aantal metingen de onderste middelste waarde.
+## AI-gebruik
 
-Een display dat bij opstarten ontbreekt, wordt later niet opnieuw gezocht.
-I2C-wachten heeft een timeout. Langdurig gebruik, geheugenfragmentatie en de
-stackmarge op de Uno zijn nog niet fysiek onderzocht.
+Ik heb Codex gebruikt om de code te controleren en te verbeteren, de tests te controleren
+en reviews uit te voeren. Codex heeft ook geholpen met de testcode en documentatie
+en heeft de beschreven automatische controles lokaal uitgevoerd.
 
-## Werkwijze
-
-Bij de code, tests en documentatie in deze review is AI-assistentie (Codex)
-gebruikt. Builds en automatische tests zijn tijdens de eerdere reviews lokaal
-uitgevoerd door de assistent. De handmatige praktijktests zijn door de student
-uitgevoerd en gemeld. Er zijn geen schoolspecifieke regels
-over AI-gebruik meegeleverd. Controleer daarom bij de opleiding welke vermelding
-nodig is en welke hulp is toegestaan. De code kunnen uitleggen blijft onderdeel
-van de beoordeling.
-
-Het [testrapport](docs/TESTRAPPORT.md) is het centrale testdocument. De
-testcommando's geven uitvoer in de terminal; aparte log- of XML-bestanden zijn
-niet nodig. PlatformIO bewaart buildproducten en testprogramma's onder `.pio/`,
-dat buiten Git blijft.
+De praktijktests van 25 en 28 oktober 2026 heb ik zelf uitgevoerd, eerst zonder en daarna met LCD.
+Ik moet de code zelf kunnen uitleggen. Voor deze opdracht houd ik rekening met de
+AIAS-niveau 3-regels van mijn opleiding.

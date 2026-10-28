@@ -10,6 +10,8 @@
 #include "filter_controls.h"
 #include "display7.h"
 #include "theremin_math.h"
+#include "i2c.h"
+#include "lcd.h"
 
 // HC-SR04: TRIG = D9 (PB1), ECHO = D8 (PB0)
 // Ingebouwde Arduino LED = D13 (PB5)
@@ -147,7 +149,9 @@ int main(void)
 
     volume_init();
     buzzer_init();
+    i2c_init();
     display7_init();
+    lcd_init(display7_get_address());
 
     // Zonder buffer geeft het filter de meting ongewijzigd terug
     // Het display toont dan 0 en plus kan opnieuw geheugen aanvragen
@@ -205,6 +209,7 @@ int main(void)
             // Timer1: 1 tick = 0,5 us
             // Afstand = tijd in us / 58
             uint16_t distance_cm = theremin_distance_cm(ticks);
+            uint16_t frequency = 230;
 
             if (theremin_distance_valid(distance_cm))
             {
@@ -212,18 +217,18 @@ int main(void)
 
                 uint16_t filtered_distance = median_filter_add(distance_cm);
 
-                uint16_t frequency = theremin_frequency_hz(filtered_distance);
-
-                buzzer_set_frequency(frequency);
+                frequency = theremin_frequency_hz(filtered_distance);
             }
             else
             {
                 // Ongeldige afstand: LED uit
                 PORTB &= ~(1 << LED_PIN);
-
-                // Laagste toonhoogte
-                buzzer_set_frequency(230);
             }
+
+            buzzer_set_frequency(frequency);
+            lcd_set_measurement(distance_cm, frequency);
         }
+
+        lcd_update();
     }
 }

@@ -135,10 +135,8 @@ Dezelfde filter-, reken- en debouncecode wordt ook in de pc-tests gebruikt.
 
 ## AI-gebruik
 
-Ik heb Codex gebruikt om de code te controleren en te verbeteren, de tests te controleren
+Ik heb Codex gebruikt om de code te controleren en te verbeteren, de tests uit te werken en controleren
 en reviews uit te voeren. Codex heeft ook geholpen met de testcode en documentatie
 en heeft de beschreven automatische controles lokaal uitgevoerd.
 
-De praktijktests van 25 en 28 oktober 2026 heb ik zelf uitgevoerd, eerst zonder en daarna met LCD.
-Ik moet de code zelf kunnen uitleggen. Voor deze opdracht houd ik rekening met de
-AIAS-niveau 3-regels van mijn opleiding.
+De praktijktests van 25 en 28 oktober 2026 heb ik zelf uitgevoerd, eerst zonder en daarna met LCD. Ten slotte heb ik de tests door een derde laten uitvoeren aan de hand van de handleiding

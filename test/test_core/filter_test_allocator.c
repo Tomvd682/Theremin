@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// De tests tellen allocaties en kunnen malloc laten mislukken
+// Tel geheugenaanvragen en laat malloc zo nodig mislukken
 // Alleen het filter gebruikt deze extra geheugencontrole
 // De union zorgt dat de buffer goed is uitgelijnd
 typedef union
@@ -76,7 +76,7 @@ void filter_test_free(void *pointer)
             if (!valid_guard(header)) ++errors;
             memset(pointer, 0xDD, header->data.size);
             free(header);
-            // Vul het lege vak met de laatste actieve allocatie
+            // Laat geen lege plekken in de lijst met actieve buffers
             --blocks;
             live[i] = live[blocks];
             ++free_calls;

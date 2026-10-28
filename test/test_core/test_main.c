@@ -190,8 +190,7 @@ static void test_free_is_idempotent_and_reinitialization_is_empty(void)
     TEST_ASSERT_EQUAL_UINT16(10, median_filter_add(10));
 }
 
-// Controleer het filter met een andere sorteermethode
-// De originele metingen blijven op volgorde van binnenkomst
+// Gebruik een andere sorteermethode om de filteruitkomst te controleren
 static uint16_t reference_median(const uint16_t *values, uint8_t count)
 {
     uint16_t sorted[15];
@@ -217,7 +216,7 @@ static void test_long_sequence_with_resizes_matches_reference(void)
     TEST_ASSERT_TRUE(median_filter_resize(size));
     for (uint32_t step = 0; step < 30000UL; ++step)
     {
-        // De vaste beginwaarde geeft elke testrun dezelfde meetreeks
+        // Elke testrun gebruikt dezelfde meetreeks
         random = random * 1664525UL + 1013904223UL;
         if (step % 37UL == 0)
         {
